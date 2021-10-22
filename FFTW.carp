@@ -1,0 +1,5 @@
+(system-include "fftw3.h")
+(add-pkg "fftw3")
+
+(defn main []
+  0)
