@@ -1,5 +1,26 @@
 (system-include "fftw3.h")
 (add-pkg "fftw3")
 
+(register-type SizeT "size_t")
+
+(defmodule SizeT
+  (deftemplate from-long (Fn [Long] SizeT)
+    "size_t $NAME (long x)"
+    "$DECL {
+      return (size_t)x;
+     }"))
+
+(defmodule FFTW
+  (register alloc-real (Fn [SizeT] (Ptr Double)) "fftw_alloc_real")
+  (register free (Fn [(Ptr ())] ()) "fftw_free"))
+
+(defn sine-wave [freq arr samples]
+  )
+
 (defn main []
-  0)
+  (let-do [left-channel-in (alloc-real (SizeT.from-long (/ 44100l 2l)))
+           right-channel-in (alloc-real (SizeT.from-long (/ 44100l 2l)))]
+
+    (FFTW.free (Unsafe.coerce left-channel-in))
+    (FFTW.free (Unsafe.coerce right-channel-in))
+    0))
