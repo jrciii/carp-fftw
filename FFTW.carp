@@ -1,26 +1,69 @@
 (system-include "fftw3.h")
-(add-pkg "fftw3")
+;(add-pkg "fftw3")
+(add-pkg "fftw3f")
 
 (register-type SizeT "size_t")
+(register-type FFTWFPlan "fftwf_plan")
+(register-type FFTWR2RKind "fftw_r2r_kind")
+(register FFTWEstimate Uint32 "FFTW_ESTIMATE")
+(register FFTWR2HC FFTWR2RKind "FFTW_R2HC")
 
 (defmodule SizeT
-  (deftemplate from-long (Fn [Long] SizeT)
-    "size_t $NAME (long x)"
+  (deftemplate from-uint (Fn [Uint64] SizeT)
+    "size_t $NAME (uint64_t x)"
     "$DECL {
       return (size_t)x;
+     }")
+  (deftemplate to-uint (Fn [SizeT] Uint64)
+    "size_t $NAME (size_t x)"
+    "$DECL {
+      return (uint64_t)x;
      }"))
 
-(defmodule FFTW
-  (register alloc-real (Fn [SizeT] (Ptr Double)) "fftw_alloc_real")
-  (register free (Fn [(Ptr ())] ()) "fftw_free"))
+(register sizeof (Fn [a] SizeT) "sizeof")
+
+(defmodule FFTWF
+  (register alloc-real (Fn [SizeT] (Ptr Float)) "fftwf_alloc_real")
+  (register free (Fn [(Ptr ())] ()) "fftwf_free")
+  (register plan-r2r-1d (Fn [Int (Ptr Float) (Ptr Float) FFTWR2RKind Uint32] FFTWFPlan) "fftwf_plan_r2r_1d")
+  (register execute (Fn [FFTWFPlan] ()) "fftwf_execute")
+  (register destroy-plan (Fn [FFTWFPlan] ()) "fftwf_destroy_plan"))
+
+(defmacro do-range [counter start end step :rest body]
+  `(let-do [%counter %start]
+     (while (< %counter %end)
+       (do %@body (set! %counter (+ %counter %step))))))
 
 (defn sine-wave [freq arr samples]
-  )
+  (let-do [delta (Float./ 1.0f (Float.from-int samples))]
+    (do-range i 0 samples 1
+              (let [t (* (Float.from-int i) delta)
+                    r (* 0.5f
+                        (Float.sin (*
+                                    (* 2.0f Float.pi)
+                                    (* (Float.from-int freq) t))))]
+                (Pointer.unsafe-set
+                 (Pointer.add arr (Long.from-int i))
+                 r)))))
 
 (defn main []
-  (let-do [left-channel-in (alloc-real (SizeT.from-long (/ 44100l 2l)))
-           right-channel-in (alloc-real (SizeT.from-long (/ 44100l 2l)))]
-
-    (FFTW.free (Unsafe.coerce left-channel-in))
-    (FFTW.free (Unsafe.coerce right-channel-in))
+  (let-do [channel-in (alloc-real (SizeT.from-uint (Uint64.from-long 44100l)))
+           channel-out (alloc-real (SizeT.from-uint (Uint64.from-long 44100l)))
+           plan (plan-r2r-1d 44100 channel-in channel-out FFTWR2HC FFTWEstimate)
+           maxv 0f
+           maxf 0]
+    (sine-wave 440 channel-in 44100)
+    (execute plan)
+    (do-range i 20 20000 1
+              (let-do [val (Pointer.to-value (Pointer.add channel-out (Long.from-int i)))]
+                (if (> val maxv)
+                  (do
+                    (set! maxv val)
+                    (set! maxf i))
+                  ())))
+    (println* "Max freq " maxf " val " maxv)
+    (FFTWF.free (Unsafe.coerce channel-in))
+    (FFTWF.destroy-plan plan)
     0))
+
+;; Output: Max freq 440 val 0.149419f
