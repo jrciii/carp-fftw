@@ -20,8 +20,6 @@
       return (uint64_t)x;
      }"))
 
-(register sizeof (Fn [a] SizeT) "sizeof")
-
 (defmodule FFTWF
   (register alloc-real (Fn [SizeT] (Ptr Float)) "fftwf_alloc_real")
   (register free (Fn [(Ptr ())] ()) "fftwf_free")
